@@ -2,8 +2,9 @@ import axios from 'axios'
 import { ElMessage } from 'element-plus'
 
 // 创建axios实例
+// 使用 127.0.0.1 代替 localhost 避免 IPv6 解析问题
 const request = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:5409',
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5409',
   headers: {
     'Content-Type': 'application/json'
   }

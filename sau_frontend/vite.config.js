@@ -5,6 +5,8 @@ import { resolve } from 'path'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [vue()],
+  // Electron 需要使用相对路径
+  base: './',
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src'),
@@ -19,10 +21,10 @@ export default defineConfig({
   },
   server: {
     port: 5173,
-    open: true,
+    open: false, // Electron 模式下不自动打开浏览器
     proxy: {
       '/api': {
-        target: 'http://localhost:5409',
+        target: 'http://127.0.0.1:5409',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, '')
       }

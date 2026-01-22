@@ -17,12 +17,20 @@ export const useAccountStore = defineStore('account', () => {
   const setAccounts = (accountsData) => {
     // 转换后端返回的数据格式为前端使用的格式
     accounts.value = accountsData.map(item => {
+      // 处理状态：支持数字和字符串两种格式
+      let status = '异常'
+      if (item[4] === 1 || item[4] === '正常') {
+        status = '正常'
+      } else if (item[4] === '验证中') {
+        status = '验证中'
+      }
+      
       return {
         id: item[0],
         type: item[1],
         filePath: item[2],
         name: item[3],
-        status: item[4] === 1 ? '正常' : '异常',
+        status: status,
         platform: platformTypes[item[1]] || '未知',
         avatar: '/vite.svg' // 默认使用vite.svg作为头像
       }

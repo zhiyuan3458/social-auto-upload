@@ -7,7 +7,7 @@ from myUtils.auth import check_cookie
 from utils.base_social_media import set_init_script
 import uuid
 from pathlib import Path
-from conf import BASE_DIR, LOCAL_CHROME_HEADLESS
+from conf import BASE_DIR, DATA_DIR, LOCAL_CHROME_HEADLESS
 
 # 抖音登录
 async def douyin_cookie_gen(id,status_queue):
@@ -51,7 +51,7 @@ async def douyin_cookie_gen(id,status_queue):
         uuid_v1 = uuid.uuid1()
         print(f"UUID v1: {uuid_v1}")
         # 确保cookiesFile目录存在
-        cookies_dir = Path(BASE_DIR / "cookiesFile")
+        cookies_dir = Path(DATA_DIR / "cookiesFile")
         cookies_dir.mkdir(exist_ok=True)
         await context.storage_state(path=cookies_dir / f"{uuid_v1}.json")
         result = await check_cookie(3, f"{uuid_v1}.json")
@@ -64,7 +64,7 @@ async def douyin_cookie_gen(id,status_queue):
         await page.close()
         await context.close()
         await browser.close()
-        with sqlite3.connect(Path(BASE_DIR / "db" / "database.db")) as conn:
+        with sqlite3.connect(Path(DATA_DIR / "db" / "database.db")) as conn:
             cursor = conn.cursor()
             cursor.execute('''
                                 INSERT INTO user_info (type, filePath, userName, status)
@@ -129,7 +129,7 @@ async def get_tencent_cookie(id,status_queue):
         uuid_v1 = uuid.uuid1()
         print(f"UUID v1: {uuid_v1}")
         # 确保cookiesFile目录存在
-        cookies_dir = Path(BASE_DIR / "cookiesFile")
+        cookies_dir = Path(DATA_DIR / "cookiesFile")
         cookies_dir.mkdir(exist_ok=True)
         await context.storage_state(path=cookies_dir / f"{uuid_v1}.json")
         result = await check_cookie(2,f"{uuid_v1}.json")
@@ -143,7 +143,7 @@ async def get_tencent_cookie(id,status_queue):
         await context.close()
         await browser.close()
 
-        with sqlite3.connect(Path(BASE_DIR / "db" / "database.db")) as conn:
+        with sqlite3.connect(Path(DATA_DIR / "db" / "database.db")) as conn:
             cursor = conn.cursor()
             cursor.execute('''
                                 INSERT INTO user_info (type, filePath, userName, status)
@@ -203,7 +203,7 @@ async def get_ks_cookie(id,status_queue):
         uuid_v1 = uuid.uuid1()
         print(f"UUID v1: {uuid_v1}")
         # 确保cookiesFile目录存在
-        cookies_dir = Path(BASE_DIR / "cookiesFile")
+        cookies_dir = Path(DATA_DIR / "cookiesFile")
         cookies_dir.mkdir(exist_ok=True)
         await context.storage_state(path=cookies_dir / f"{uuid_v1}.json")
         result = await check_cookie(4, f"{uuid_v1}.json")
@@ -217,7 +217,7 @@ async def get_ks_cookie(id,status_queue):
         await context.close()
         await browser.close()
 
-        with sqlite3.connect(Path(BASE_DIR / "db" / "database.db")) as conn:
+        with sqlite3.connect(Path(DATA_DIR / "db" / "database.db")) as conn:
             cursor = conn.cursor()
             cursor.execute('''
                                         INSERT INTO user_info (type, filePath, userName, status)
@@ -277,7 +277,7 @@ async def xiaohongshu_cookie_gen(id,status_queue):
         uuid_v1 = uuid.uuid1()
         print(f"UUID v1: {uuid_v1}")
         # 确保cookiesFile目录存在
-        cookies_dir = Path(BASE_DIR / "cookiesFile")
+        cookies_dir = Path(DATA_DIR / "cookiesFile")
         cookies_dir.mkdir(exist_ok=True)
         await context.storage_state(path=cookies_dir / f"{uuid_v1}.json")
         result = await check_cookie(1, f"{uuid_v1}.json")
@@ -291,7 +291,7 @@ async def xiaohongshu_cookie_gen(id,status_queue):
         await context.close()
         await browser.close()
 
-        with sqlite3.connect(Path(BASE_DIR / "db" / "database.db")) as conn:
+        with sqlite3.connect(Path(DATA_DIR / "db" / "database.db")) as conn:
             cursor = conn.cursor()
             cursor.execute('''
                            INSERT INTO user_info (type, filePath, userName, status)

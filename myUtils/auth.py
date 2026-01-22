@@ -5,7 +5,7 @@ import os
 from playwright.async_api import async_playwright
 from xhs import XhsClient
 
-from conf import BASE_DIR, LOCAL_CHROME_HEADLESS
+from conf import BASE_DIR, DATA_DIR, LOCAL_CHROME_HEADLESS
 from utils.base_social_media import set_init_script
 from utils.log import tencent_logger, kuaishou_logger, douyin_logger
 from pathlib import Path
@@ -106,16 +106,16 @@ async def check_cookie(type, file_path):
     match type:
         # 小红书
         case 1:
-            return await cookie_auth_xhs(Path(BASE_DIR / "cookiesFile" / file_path))
+            return await cookie_auth_xhs(Path(DATA_DIR / "cookiesFile" / file_path))
         # 视频号
         case 2:
-            return await cookie_auth_tencent(Path(BASE_DIR / "cookiesFile" / file_path))
+            return await cookie_auth_tencent(Path(DATA_DIR / "cookiesFile" / file_path))
         # 抖音
         case 3:
-            return await cookie_auth_douyin(Path(BASE_DIR / "cookiesFile" / file_path))
+            return await cookie_auth_douyin(Path(DATA_DIR / "cookiesFile" / file_path))
         # 快手
         case 4:
-            return await cookie_auth_ks(Path(BASE_DIR / "cookiesFile" / file_path))
+            return await cookie_auth_ks(Path(DATA_DIR / "cookiesFile" / file_path))
         case _:
             return False
 

@@ -672,7 +672,7 @@ const handleDelete = (row) => {
 // 下载Cookie文件
 const handleDownloadCookie = (row) => {
   // 从后端获取Cookie文件
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5409'
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5409'
   const downloadUrl = `${baseUrl}/downloadCookie?filePath=${encodeURIComponent(row.filePath)}`
 
   // 创建一个隐藏的链接来触发下载
@@ -714,7 +714,7 @@ const handleUploadCookie = (row) => {
       formData.append('platform', row.platform)
 
       // 发送上传请求
-      const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5409'
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5409'
       const response = await fetch(`${baseUrl}/uploadCookie`, {
         method: 'POST',
         body: formData
@@ -803,7 +803,7 @@ const connectSSE = (platform, name) => {
   const type = platformTypeMap[platform] || '1'
 
   // 创建SSE连接
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5409'
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5409'
   const url = `${baseUrl}/login?type=${type}&id=${encodeURIComponent(name)}`
 
   eventSource = new EventSource(url)
@@ -814,14 +814,17 @@ const connectSSE = (platform, name) => {
     console.log('SSE消息:', data)
 
     // 如果还没有二维码数据，且数据长度较长，认为是二维码
-    if (!qrCodeData.value && data.length > 100) {
+    if (!qrCodeData.value && data.length > 50) {
       try {
-        // 确保数据是有效的base64编码
-        // 如果数据已经包含了data:image前缀，直接使用
+        // 确保数据是有效的图片数据
         if (data.startsWith('data:image')) {
+          // 已经是完整的 data URL，直接使用
+          qrCodeData.value = data
+        } else if (data.startsWith('http://') || data.startsWith('https://')) {
+          // 是 URL 格式，直接使用
           qrCodeData.value = data
         } else {
-          // 否则添加前缀
+          // 假设是 base64 编码，添加前缀
           qrCodeData.value = `data:image/png;base64,${data}`
         }
         console.log('设置二维码数据，长度:', data.length)

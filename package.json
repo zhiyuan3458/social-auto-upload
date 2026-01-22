@@ -1,0 +1,98 @@
+{
+  "name": "social-auto-upload",
+  "version": "1.0.0",
+  "description": "社交媒体自动上传工具 - 支持小红书、抖音、快手、视频号等平台",
+  "main": "electron/main.js",
+  "author": "Edan.Lee",
+  "license": "MIT",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:electron\"",
+    "dev:frontend": "cd sau_frontend && npm run dev",
+    "dev:electron": "wait-on http://localhost:5173 && electron .",
+    "build:frontend": "cd sau_frontend && npm run build",
+    "build:backend:win": "pyinstaller --onefile --name sau_backend --distpath build/backend sau_backend.py --add-data \"cookiesFile;cookiesFile\" --add-data \"db;db\" --add-data \"utils;utils\" --add-data \"myUtils;myUtils\" --add-data \"uploader;uploader\" --hidden-import=playwright",
+    "build:backend:mac": "pyinstaller --onefile --name sau_backend --distpath build/backend sau_backend.py --add-data \"cookiesFile:cookiesFile\" --add-data \"db:db\" --add-data \"utils:utils\" --add-data \"myUtils:myUtils\" --add-data \"uploader:uploader\" --hidden-import=playwright",
+    "build:win": "npm run build:frontend && electron-builder --win",
+    "build:mac": "npm run build:frontend && electron-builder --mac",
+    "build:all": "npm run build:frontend && electron-builder --mac --win",
+    "pack": "electron-builder --dir",
+    "postinstall": "electron-builder install-app-deps"
+  },
+  "dependencies": {
+    "electron-is-dev": "^3.0.1"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "electron": "^28.1.0",
+    "electron-builder": "^24.9.1",
+    "wait-on": "^7.2.0"
+  },
+  "build": {
+    "appId": "com.socialautoupload.app",
+    "productName": "Social Auto Upload",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "electron/**/*",
+      "sau_frontend/dist/**/*",
+      "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}",
+      "!**/node_modules/*/{test,__tests__,tests,powered-test,example,examples}",
+      "!**/node_modules/*.d.ts",
+      "!**/*.{iml,o,hprof,orig,pyc,pyo,rbc,swp,csproj,sln,xproj}"
+    ],
+    "extraResources": [
+      {
+        "from": "build/backend/",
+        "to": "backend/",
+        "filter": ["**/*"]
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "icon": "build/icon.icns",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64"]
+        }
+      ],
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false
+    },
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": true,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Social Auto Upload"
+    },
+    "dmg": {
+      "contents": [
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    }
+  }
+}
