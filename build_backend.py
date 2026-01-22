@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
-Python 后端打包脚本
-支持 Windows 和 macOS
-自动包含 Playwright Chromium 浏览器
+Python backend build script
+Supports Windows and macOS
+Auto-includes Playwright Chromium browser
 """
 
 import os
@@ -12,32 +13,33 @@ import subprocess
 import shutil
 from pathlib import Path
 
+# Fix Windows encoding issue
+if platform.system() == 'Windows':
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+
 def get_separator():
-    """获取路径分隔符（PyInstaller --add-data 用）"""
+    """Get path separator for PyInstaller --add-data"""
     return ';' if platform.system() == 'Windows' else ':'
 
 def get_playwright_browsers_path():
-    """获取 Playwright 浏览器安装路径"""
-    # Playwright 默认安装路径
+    """Get Playwright browser install path"""
     if platform.system() == 'Windows':
         base = Path(os.environ.get('LOCALAPPDATA', '')) / 'ms-playwright'
     else:  # macOS / Linux
         base = Path.home() / 'Library' / 'Caches' / 'ms-playwright'
     
     if not base.exists():
-        # 尝试另一个常见路径
         base = Path.home() / '.cache' / 'ms-playwright'
     
     return base
 
 def find_chromium_path():
-    """查找已安装的 Chromium 路径"""
+    """Find installed Chromium path"""
     browsers_path = get_playwright_browsers_path()
     
     if not browsers_path.exists():
         return None
     
-    # 查找 chromium 目录
     for item in browsers_path.iterdir():
         if item.is_dir() and 'chromium' in item.name.lower():
             return item
@@ -45,26 +47,26 @@ def find_chromium_path():
     return None
 
 def build_backend():
-    """打包后端"""
+    """Build backend"""
     print("=" * 60)
-    print("开始打包 Python 后端...")
-    print(f"系统: {platform.system()}")
+    print("Building Python backend...")
+    print(f"System: {platform.system()}")
     print("=" * 60)
     
-    # 项目根目录
+    # Project root directory
     root_dir = Path(__file__).parent.resolve()
     os.chdir(root_dir)
     
-    # 输出目录
+    # Output directory
     output_dir = root_dir / "build" / "backend"
     output_dir.mkdir(parents=True, exist_ok=True)
     
     sep = get_separator()
     
-    # 查找 Playwright Chromium
+    # Find Playwright Chromium
     chromium_path = find_chromium_path()
     
-    # PyInstaller 参数 - 使用绝对路径
+    # PyInstaller arguments
     pyinstaller_args = [
         sys.executable, "-m", "PyInstaller",
         "--onefile",
@@ -72,36 +74,36 @@ def build_backend():
         "--distpath", str(output_dir),
         "--workpath", str(root_dir / "build" / "temp"),
         "--specpath", str(root_dir / "build"),
-        # 添加数据文件（使用绝对路径）
+        # Add data files
         f"--add-data={root_dir / 'utils'}{sep}utils",
         f"--add-data={root_dir / 'myUtils'}{sep}myUtils",
         f"--add-data={root_dir / 'uploader'}{sep}uploader",
-        # 隐式导入
+        # Hidden imports
         "--hidden-import=playwright",
         "--hidden-import=playwright.sync_api",
         "--hidden-import=playwright.async_api",
         "--hidden-import=flask",
         "--hidden-import=flask_cors",
         "--hidden-import=sqlite3",
-        # 清理
+        # Clean
         "--clean",
-        # 入口文件（使用绝对路径）
+        # Entry file
         str(root_dir / "sau_backend.py")
     ]
     
-    print("执行命令:")
+    print("Running command:")
     print(" ".join(pyinstaller_args))
     print()
     
-    # 运行 PyInstaller
+    # Run PyInstaller
     result = subprocess.run(pyinstaller_args)
     
     if result.returncode != 0:
-        print("❌ 打包失败!")
+        print("[X] Build failed!")
         return False
     
-    # 复制必要的数据目录
-    print("\n复制数据目录...")
+    # Copy data directories
+    print("\nCopying data directories...")
     
     data_dirs = ["cookiesFile", "db", "videoFile"]
     for dir_name in data_dirs:
@@ -112,37 +114,36 @@ def build_backend():
             if dst.exists():
                 shutil.rmtree(dst)
             shutil.copytree(src, dst)
-            print(f"  ✓ 复制 {dir_name}/")
+            print(f"  [OK] Copied {dir_name}/")
         else:
-            # 创建空目录
             dst.mkdir(parents=True, exist_ok=True)
-            print(f"  ✓ 创建 {dir_name}/")
+            print(f"  [OK] Created {dir_name}/")
     
-    # 复制 Playwright Chromium 浏览器
-    print("\n复制 Playwright Chromium 浏览器...")
+    # Copy Playwright Chromium browser
+    print("\nCopying Playwright Chromium browser...")
     if chromium_path and chromium_path.exists():
         dst_browsers = output_dir / "ms-playwright" / chromium_path.name
         if dst_browsers.exists():
             shutil.rmtree(dst_browsers)
         dst_browsers.parent.mkdir(parents=True, exist_ok=True)
         shutil.copytree(chromium_path, dst_browsers)
-        print(f"  ✓ 复制 Chromium: {chromium_path.name}")
-        print(f"    大小: {get_dir_size(dst_browsers):.1f} MB")
+        print(f"  [OK] Copied Chromium: {chromium_path.name}")
+        print(f"       Size: {get_dir_size(dst_browsers):.1f} MB")
     else:
-        print("  ⚠️ 未找到 Playwright Chromium，请先运行:")
-        print("     python -m playwright install chromium")
-        print("  ⚠️ 用户需要自行安装浏览器!")
+        print("  [WARN] Playwright Chromium not found, please run:")
+        print("         python -m playwright install chromium")
+        print("  [WARN] Users need to install browser manually!")
     
     print()
     print("=" * 60)
-    print("✅ 后端打包完成!")
-    print(f"输出目录: {output_dir}")
+    print("[OK] Backend build completed!")
+    print(f"Output directory: {output_dir}")
     print("=" * 60)
     
     return True
 
 def get_dir_size(path):
-    """计算目录大小(MB)"""
+    """Calculate directory size (MB)"""
     total = 0
     for p in Path(path).rglob('*'):
         if p.is_file():
@@ -150,17 +151,17 @@ def get_dir_size(path):
     return total / (1024 * 1024)
 
 def install_playwright_browsers():
-    """安装 Playwright 浏览器"""
-    print("安装 Playwright Chromium 浏览器...")
+    """Install Playwright browser"""
+    print("Installing Playwright Chromium browser...")
     subprocess.run([sys.executable, "-m", "playwright", "install", "chromium"])
-    print("✅ 安装完成!")
+    print("[OK] Installation completed!")
 
 if __name__ == "__main__":
     import argparse
     
-    parser = argparse.ArgumentParser(description="打包 Python 后端")
+    parser = argparse.ArgumentParser(description="Build Python backend")
     parser.add_argument("--install-browsers", action="store_true", 
-                       help="安装 Playwright 浏览器")
+                       help="Install Playwright browser")
     
     args = parser.parse_args()
     
