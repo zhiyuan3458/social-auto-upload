@@ -34,15 +34,28 @@ def get_playwright_browsers_path():
     return base
 
 def find_chromium_path():
-    """Find installed Chromium path"""
+    """Find the latest Chromium browser path"""
     browsers_path = get_playwright_browsers_path()
     
     if not browsers_path.exists():
         return None
     
+    chromium_versions = []
     for item in browsers_path.iterdir():
-        if item.is_dir() and 'chromium' in item.name.lower():
-            return item
+        # 匹配 chromium-XXXX 格式（不包含 headless_shell）
+        if item.is_dir() and item.name.startswith('chromium-') and 'headless' not in item.name.lower():
+            try:
+                # 提取版本号（chromium-1200 -> 1200）
+                version = int(item.name.split('-')[1])
+                chromium_versions.append((version, item))
+            except (ValueError, IndexError):
+                # 如果版本号解析失败，跳过
+                continue
+    
+    if chromium_versions:
+        # 按版本号排序，返回最新版本
+        chromium_versions.sort(key=lambda x: x[0], reverse=True)
+        return chromium_versions[0][1]
     
     return None
 
@@ -63,9 +76,6 @@ def build_backend():
     
     sep = get_separator()
     
-    # Find Playwright Chromium
-    chromium_path = find_chromium_path()
-    
     # PyInstaller arguments
     pyinstaller_args = [
         sys.executable, "-m", "PyInstaller",
@@ -78,6 +88,7 @@ def build_backend():
         f"--add-data={root_dir / 'utils'}{sep}utils",
         f"--add-data={root_dir / 'myUtils'}{sep}myUtils",
         f"--add-data={root_dir / 'uploader'}{sep}uploader",
+        f"--add-data={root_dir / 'ai_module'}{sep}ai_module",  # AI module
         # Hidden imports
         "--hidden-import=playwright",
         "--hidden-import=playwright.sync_api",
@@ -85,6 +96,8 @@ def build_backend():
         "--hidden-import=flask",
         "--hidden-import=flask_cors",
         "--hidden-import=sqlite3",
+        "--hidden-import=PIL",
+        "--hidden-import=yaml",
         # Clean
         "--clean",
         # Entry file
@@ -105,7 +118,7 @@ def build_backend():
     # Copy data directories
     print("\nCopying data directories...")
     
-    data_dirs = ["cookiesFile", "db", "videoFile"]
+    data_dirs = ["cookiesFile", "db", "videoFile", "ai_config"]
     for dir_name in data_dirs:
         src = root_dir / dir_name
         dst = output_dir / dir_name
@@ -119,16 +132,21 @@ def build_backend():
             dst.mkdir(parents=True, exist_ok=True)
             print(f"  [OK] Created {dir_name}/")
     
-    # Copy Playwright Chromium browser
+    # Copy latest Playwright Chromium browser
     print("\nCopying Playwright Chromium browser...")
+    chromium_path = find_chromium_path()
+    
     if chromium_path and chromium_path.exists():
-        dst_browsers = output_dir / "ms-playwright" / chromium_path.name
-        if dst_browsers.exists():
-            shutil.rmtree(dst_browsers)
-        dst_browsers.parent.mkdir(parents=True, exist_ok=True)
+        # 清理旧的 ms-playwright 目录
+        dst_browsers_root = output_dir / "ms-playwright"
+        if dst_browsers_root.exists():
+            shutil.rmtree(dst_browsers_root)
+        dst_browsers_root.mkdir(parents=True, exist_ok=True)
+        
+        dst_browsers = dst_browsers_root / chromium_path.name
         shutil.copytree(chromium_path, dst_browsers)
-        print(f"  [OK] Copied Chromium: {chromium_path.name}")
-        print(f"       Size: {get_dir_size(dst_browsers):.1f} MB")
+        size = get_dir_size(dst_browsers)
+        print(f"  [OK] Copied: {chromium_path.name} ({size:.1f} MB)")
     else:
         print("  [WARN] Playwright Chromium not found, please run:")
         print("         python -m playwright install chromium")

@@ -23,6 +23,12 @@ export default defineConfig({
     port: 5173,
     open: false, // Electron 模式下不自动打开浏览器
     proxy: {
+      // AI 模块接口保持 /api/ai 前缀
+      '/api/ai': {
+        target: 'http://127.0.0.1:5409',
+        changeOrigin: true
+      },
+      // 其他 /api 请求去掉前缀转发到后端
       '/api': {
         target: 'http://127.0.0.1:5409',
         changeOrigin: true,

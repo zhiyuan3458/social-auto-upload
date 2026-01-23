@@ -187,4 +187,6 @@ db/database.db
 cookiesFile
 uploadFile
 videoFile
+release
+ai_history
 

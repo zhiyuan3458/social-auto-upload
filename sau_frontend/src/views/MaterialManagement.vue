@@ -25,15 +25,39 @@
       
       <div v-if="filteredMaterials.length > 0" class="material-list">
         <el-table :data="filteredMaterials" style="width: 100%">
-          <el-table-column prop="uuid" label="UUID" width="180" />
-          <el-table-column prop="filename" label="文件名" width="300" />
-          <el-table-column prop="filesize" label="文件大小" width="120">
+          <el-table-column label="预览" width="100">
             <template #default="scope">
-              {{ scope.row.filesize }} MB
+              <div class="thumbnail-cell" @click="handlePreview(scope.row)">
+                <el-image 
+                  v-if="isImageFile(scope.row.filename)"
+                  :src="getPreviewUrl(scope.row.file_path)"
+                  fit="cover"
+                  class="thumbnail-image"
+                  :preview-src-list="[]"
+                >
+                  <template #error>
+                    <div class="thumbnail-error">
+                      <el-icon><Picture /></el-icon>
+                    </div>
+                  </template>
+                </el-image>
+                <div v-else-if="isVideoFile(scope.row.filename)" class="thumbnail-video">
+                  <el-icon><VideoCamera /></el-icon>
+                </div>
+                <div v-else class="thumbnail-file">
+                  <el-icon><Document /></el-icon>
+                </div>
+              </div>
+            </template>
+          </el-table-column>
+          <el-table-column prop="filename" label="文件名" min-width="200" />
+          <el-table-column prop="filesize" label="文件大小" width="100">
+            <template #default="scope">
+              {{ scope.row.filesize ? scope.row.filesize.toFixed(2) : '0' }} MB
             </template>
           </el-table-column>
           <el-table-column prop="upload_time" label="上传时间" width="180" />
-          <el-table-column label="操作">
+          <el-table-column label="操作" width="150">
             <template #default="scope">
               <el-button size="small" @click="handlePreview(scope.row)">预览</el-button>
               <el-button size="small" type="danger" @click="handleDelete(scope.row)">删除</el-button>
@@ -142,7 +166,7 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
-import { Refresh, Upload } from '@element-plus/icons-vue'
+import { Refresh, Upload, Picture, VideoCamera, Document } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { materialApi } from '@/api/material'
 import { useAppStore } from '@/stores/app'
@@ -445,6 +469,64 @@ onMounted(() => {
     
     .material-list {
       margin-top: 20px;
+      
+      .thumbnail-cell {
+        cursor: pointer;
+        width: 60px;
+        height: 60px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 6px;
+        overflow: hidden;
+        background: #f5f7fa;
+        
+        &:hover {
+          opacity: 0.8;
+        }
+        
+        .thumbnail-image {
+          width: 60px;
+          height: 60px;
+          
+          :deep(img) {
+            object-fit: cover;
+          }
+        }
+        
+        .thumbnail-error {
+          width: 60px;
+          height: 60px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: #f5f7fa;
+          color: #909399;
+          font-size: 24px;
+        }
+        
+        .thumbnail-video {
+          width: 60px;
+          height: 60px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          color: white;
+          font-size: 24px;
+        }
+        
+        .thumbnail-file {
+          width: 60px;
+          height: 60px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: #e6e8eb;
+          color: #606266;
+          font-size: 24px;
+        }
+      }
     }
     
     .empty-data {

@@ -1,0 +1,23 @@
+Generate an image for a Xiaohongshu (Little Red Book) social media post.
+
+User's topic: {user_topic}
+
+Page type: {page_type}
+
+Page content:
+{page_content}
+
+Full outline context:
+{full_outline}
+
+Image requirements:
+1. Style: Modern, clean, aesthetic, Instagram-worthy
+2. Aspect ratio: 3:4 (portrait orientation, suitable for mobile)
+3. Quality: High resolution, professional looking
+4. Mood: Bright, positive, aspirational
+5. Text: Do NOT include any text in the image
+6. For cover page: Make it eye-catching and scroll-stopping
+7. For content pages: Illustrate the key point clearly
+8. For summary page: Create a warm, concluding visual
+
+The image should be suitable for a Chinese social media platform targeting young, style-conscious users.

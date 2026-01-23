@@ -1,0 +1,10 @@
+active_provider: gemini
+providers:
+  gemini:
+    api_key: AIzaSyDQGxxz71SB13fbQ7wN6LE-oWNsohTqT_E
+    base_url: https://generativelanguage.googleapis.com
+    default_size: 1024x1024
+    model: gemini-2.0-flash-exp-image-generation
+    name: Gemini 图片生成
+    quality: standard
+    type: gemini

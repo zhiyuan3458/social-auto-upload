@@ -35,4 +35,4 @@ setup_playwright_browsers()
 
 XHS_SERVER = "http://127.0.0.1:11901"
 LOCAL_CHROME_PATH = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"   # Mac Chrome 路径
-LOCAL_CHROME_HEADLESS = True  # Electron 模式下使用无头浏览器
+LOCAL_CHROME_HEADLESS = False  # 登录时需要可见窗口输入验证码，设为 False

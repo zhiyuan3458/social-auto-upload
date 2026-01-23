@@ -62,13 +62,21 @@
             />
           </div>
 
-          <!-- 视频上传区域 -->
+          <!-- 内容类型切换（仅小红书显示） -->
+          <div v-if="tab.selectedPlatform === 1" class="content-type-switch">
+            <el-radio-group v-model="tab.contentType" size="large">
+              <el-radio-button value="video">视频</el-radio-button>
+              <el-radio-button value="image">图文</el-radio-button>
+            </el-radio-group>
+          </div>
+
+          <!-- 上传区域 -->
           <div class="upload-section">
-            <h3>视频</h3>
+            <h3>{{ tab.contentType === 'image' ? '图片' : '视频' }}</h3>
             <div class="upload-options">
               <el-button type="primary" @click="showUploadOptions(tab)" class="upload-btn">
                 <el-icon><Upload /></el-icon>
-                上传视频
+                {{ tab.contentType === 'image' ? '上传图片' : '上传视频' }}
               </el-button>
             </div>
             
@@ -110,25 +118,28 @@
             title="本地上传"
             width="600px"
             class="local-upload-dialog"
+            @opened="handleUploadDialogOpened"
           >
             <el-upload
+              ref="uploadRef"
               class="video-upload"
               drag
               :auto-upload="true"
               :action="`${apiBaseUrl}/upload`"
               :on-success="(response, file) => handleUploadSuccess(response, file, currentUploadTab)"
               :on-error="handleUploadError"
+              :on-change="handleFileChange"
               multiple
-              accept="video/*"
+              :accept="currentUploadTab?.contentType === 'image' ? 'image/*' : 'video/*'"
               :headers="authHeaders"
             >
               <el-icon class="el-icon--upload"><Upload /></el-icon>
               <div class="el-upload__text">
-                将视频文件拖到此处，或<em>点击上传</em>
+                将{{ currentUploadTab?.contentType === 'image' ? '图片' : '视频' }}文件拖到此处，或<em>点击上传</em>
               </div>
               <template #tip>
                 <div class="el-upload__tip">
-                  支持MP4、AVI等视频格式，可上传多个文件
+                  {{ currentUploadTab?.contentType === 'image' ? '支持JPG、PNG等图片格式，可上传多个文件' : '支持MP4、AVI等视频格式，可上传多个文件' }}
                 </div>
               </template>
             </el-upload>
@@ -191,7 +202,7 @@
           <el-dialog
             v-model="materialLibraryVisible"
             title="选择素材"
-            width="800px"
+            width="900px"
             class="material-library-dialog"
           >
             <div class="material-library-content">
@@ -204,10 +215,39 @@
                   >
                     <el-checkbox :label="material.id" class="material-checkbox">
                       <div class="material-info">
-                        <div class="material-name">{{ material.filename }}</div>
-                        <div class="material-details">
-                          <span class="file-size">{{ material.filesize }}MB</span>
-                          <span class="upload-time">{{ material.upload_time }}</span>
+                        <!-- 缩略图预览 -->
+                        <div 
+                          class="material-thumbnail image-thumbnail-clickable" 
+                          v-if="isImageFile(material.filename)"
+                          @click.stop="previewMaterial(material)"
+                        >
+                          <el-image
+                            :src="getMaterialPreviewUrl(material.file_path)"
+                            fit="cover"
+                            class="thumbnail-image"
+                            :preview-src-list="[]"
+                            lazy
+                          >
+                            <template #error>
+                              <div class="thumbnail-error">
+                                <el-icon><Picture /></el-icon>
+                              </div>
+                            </template>
+                          </el-image>
+                        </div>
+                        <div class="material-thumbnail video-thumbnail" v-else-if="isVideoFile(material.filename)">
+                          <el-icon class="video-icon"><VideoCamera /></el-icon>
+                        </div>
+                        <div class="material-thumbnail file-thumbnail" v-else>
+                          <el-icon class="file-icon"><Document /></el-icon>
+                        </div>
+                        
+                        <div class="material-details-wrapper">
+                          <div class="material-name">{{ material.filename }}</div>
+                          <div class="material-meta">
+                            <span class="file-size">{{ material.filesize ? material.filesize.toFixed(2) : '0' }}MB</span>
+                            <span class="upload-time">{{ material.upload_time }}</span>
+                          </div>
                         </div>
                       </div>
                     </el-checkbox>
@@ -221,6 +261,30 @@
                 <el-button type="primary" @click="confirmMaterialSelection">确定</el-button>
               </div>
             </template>
+          </el-dialog>
+
+          <!-- 素材预览弹窗 -->
+          <el-dialog
+            v-model="materialPreviewVisible"
+            title="素材预览"
+            width="80%"
+            class="material-preview-dialog"
+            :top="'5vh'"
+          >
+            <div class="material-preview-content" v-if="previewMaterialData">
+              <el-image
+                v-if="isImageFile(previewMaterialData.filename)"
+                :src="getMaterialPreviewUrl(previewMaterialData.file_path)"
+                fit="contain"
+                class="preview-image"
+                :preview-src-list="[getMaterialPreviewUrl(previewMaterialData.file_path)]"
+              />
+              <div v-else class="preview-info">
+                <p><strong>文件名:</strong> {{ previewMaterialData.filename }}</p>
+                <p><strong>文件大小:</strong> {{ previewMaterialData.filesize ? previewMaterialData.filesize.toFixed(2) : '0' }} MB</p>
+                <p><strong>上传时间:</strong> {{ previewMaterialData.upload_time }}</p>
+              </div>
+            </div>
           </el-dialog>
 
           <!-- 账号选择 -->
@@ -333,10 +397,24 @@
               v-model="tab.title"
               type="textarea"
               :rows="3"
-              placeholder="请输入标题"
-              maxlength="100"
+              :placeholder="tab.contentType === 'image' ? '请输入笔记标题（最多20字）' : '请输入标题'"
+              :maxlength="tab.contentType === 'image' ? 20 : 100"
               show-word-limit
               class="title-input"
+            />
+          </div>
+
+          <!-- 正文输入（仅图文模式） -->
+          <div v-if="tab.contentType === 'image'" class="content-section">
+            <h3>正文</h3>
+            <el-input
+              v-model="tab.content"
+              type="textarea"
+              :rows="6"
+              placeholder="请输入笔记正文（最多1000字）"
+              maxlength="1000"
+              show-word-limit
+              class="content-input"
             />
           </div>
 
@@ -503,12 +581,15 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed } from 'vue'
-import { Upload, Plus, Close, Folder } from '@element-plus/icons-vue'
+import { ref, reactive, computed, onMounted, nextTick } from 'vue'
+import { useRoute } from 'vue-router'
+import { Upload, Plus, Close, Folder, Picture, VideoCamera, Document } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useAccountStore } from '@/stores/account'
 import { useAppStore } from '@/stores/app'
 import { materialApi } from '@/api/material'
+
+const route = useRoute()
 
 // API base URL
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5409'
@@ -534,6 +615,11 @@ const materialLibraryVisible = ref(false)
 const currentUploadTab = ref(null)
 const selectedMaterials = ref([])
 const materials = computed(() => appStore.materials)
+const uploadRef = ref(null)
+
+// 素材预览相关状态
+const materialPreviewVisible = ref(false)
+const previewMaterialData = ref(null)
 
 // 批量发布相关状态
 const batchPublishing = ref(false)
@@ -551,11 +637,13 @@ const platforms = [
 const defaultTabInit = {
   name: 'tab1',
   label: '发布1',
+  contentType: 'video', // 内容类型：'video' 视频 | 'image' 图文
   fileList: [], // 后端返回的文件名列表
   displayFileList: [], // 用于显示的文件列表
   selectedAccounts: [], // 选中的账号ID列表
   selectedPlatform: 1, // 选中的平台（单选）
   title: '',
+  content: '', // 图文正文内容
   productLink: '', // 商品链接
   productTitle: '', // 商品名称
   selectedTopics: [], // 话题列表（不带#号）
@@ -667,6 +755,12 @@ const handleUploadSuccess = (response, file, tab) => {
   } else {
     ElMessage.error(response.msg || '上传失败')
   }
+}
+
+// 处理文件选择变化
+const handleFileChange = (file, fileList) => {
+  console.log('文件选择变化:', file, fileList)
+  // 文件选择后会自动上传（因为 auto-upload=true）
 }
 
 // 处理文件上传失败
@@ -806,28 +900,52 @@ const confirmPublish = async (tab) => {
       return
     }
 
-    // 构造发布数据，符合后端API格式
-    const publishData = {
-      type: tab.selectedPlatform,
-      title: tab.title,
-      tags: tab.selectedTopics, // 不带#号的话题列表
-      fileList: tab.fileList.map(file => file.path), // 只发送文件路径
-      accountList: tab.selectedAccounts.map(accountId => {
-        const account = accountStore.accounts.find(acc => acc.id === accountId)
-        return account ? account.filePath : accountId
-      }), // 发送账号的文件路径
-      enableTimer: tab.scheduleEnabled ? 1 : 0, // 是否启用定时发布，开启传1，不开启传0
-      videosPerDay: tab.scheduleEnabled ? tab.videosPerDay || 1 : 1, // 每天发布视频数量，1-55
-      dailyTimes: tab.scheduleEnabled ? tab.dailyTimes || ['10:00'] : ['10:00'], // 每天发布时间点
-      startDays: tab.scheduleEnabled ? tab.startDays || 0 : 0, // 从今天开始计算的发布天数，0表示明天，1表示后天
-      category: 0, //表示非原创
-      productLink: tab.productLink.trim() || '', // 商品链接
-      productTitle: tab.productTitle.trim() || '', // 商品名称
-      isDraft: tab.isDraft // 是否保存为草稿，仅视频号平台使用
+    // 判断是否为小红书图文模式
+    const isXHSImage = tab.selectedPlatform === 1 && tab.contentType === 'image'
+    
+    // 获取账号文件路径列表
+    const accountList = tab.selectedAccounts.map(accountId => {
+      const account = accountStore.accounts.find(acc => acc.id === accountId)
+      return account ? account.filePath : accountId
+    })
+
+    // 根据内容类型选择不同的发布接口
+    let publishUrl = `${apiBaseUrl}/postVideo`
+    let publishData = {}
+
+    if (isXHSImage) {
+      // 小红书图文发布
+      publishUrl = `${apiBaseUrl}/postImageXHS`
+      publishData = {
+        title: tab.title,
+        content: tab.content || '', // 正文内容
+        tags: tab.selectedTopics,
+        imageList: tab.fileList.map(file => file.name || file.path), // 图片文件名列表
+        accountList: accountList,
+        enableTimer: tab.scheduleEnabled ? 1 : 0,
+        publishTime: tab.scheduleEnabled ? `${new Date().toISOString().split('T')[0]} ${tab.dailyTimes[0] || '10:00'}` : ''
+      }
+    } else {
+      // 视频发布
+      publishData = {
+        type: tab.selectedPlatform,
+        title: tab.title,
+        tags: tab.selectedTopics,
+        fileList: tab.fileList.map(file => file.path),
+        accountList: accountList,
+        enableTimer: tab.scheduleEnabled ? 1 : 0,
+        videosPerDay: tab.scheduleEnabled ? tab.videosPerDay || 1 : 1,
+        dailyTimes: tab.scheduleEnabled ? tab.dailyTimes || ['10:00'] : ['10:00'],
+        startDays: tab.scheduleEnabled ? tab.startDays || 0 : 0,
+        category: 0,
+        productLink: tab.productLink.trim() || '',
+        productTitle: tab.productTitle.trim() || '',
+        isDraft: tab.isDraft
+      }
     }
 
     // 调用后端发布API
-    fetch(`${apiBaseUrl}/postVideo`, {
+    fetch(publishUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -846,6 +964,7 @@ const confirmPublish = async (tab) => {
         tab.fileList = []
         tab.displayFileList = []
         tab.title = ''
+        tab.content = ''
         tab.selectedTopics = []
         tab.selectedAccounts = []
         tab.scheduleEnabled = false
@@ -882,6 +1001,38 @@ const showUploadOptions = (tab) => {
 const selectLocalUpload = () => {
   uploadOptionsVisible.value = false
   localUploadVisible.value = true
+}
+
+// 上传对话框打开后的处理
+const handleUploadDialogOpened = () => {
+  // 确保上传组件正确初始化
+  nextTick(() => {
+    if (uploadRef.value && uploadRef.value.$el) {
+      // 确保点击区域可以正常工作
+      const dragger = uploadRef.value.$el.querySelector('.el-upload-dragger')
+      const input = uploadRef.value.$el.querySelector('input[type="file"]')
+      
+      if (dragger && input) {
+        // 确保 dragger 可以点击
+        dragger.style.cursor = 'pointer'
+        dragger.style.pointerEvents = 'auto'
+        
+        // 如果 Element Plus 没有自动绑定点击事件，手动绑定
+        const handleDraggerClick = (e) => {
+          // 检查是否点击了 dragger 本身或其子元素（但不是按钮）
+          const target = e.target
+          if (target === dragger || (dragger.contains(target) && target.tagName !== 'BUTTON')) {
+            e.stopPropagation()
+            input.click()
+          }
+        }
+        
+        // 移除可能存在的旧监听器，添加新的
+        dragger.removeEventListener('click', handleDraggerClick)
+        dragger.addEventListener('click', handleDraggerClick)
+      }
+    }
+  })
 }
 
 // 选择素材库
@@ -949,6 +1100,33 @@ const confirmMaterialSelection = () => {
   selectedMaterials.value = []
   currentUploadTab.value = null
   ElMessage.success(`已添加 ${addedCount} 个素材`)
+}
+
+// 判断是否为图片文件
+const isImageFile = (filename) => {
+  if (!filename) return false
+  const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg']
+  return imageExtensions.some(ext => filename.toLowerCase().endsWith(ext))
+}
+
+// 判断是否为视频文件
+const isVideoFile = (filename) => {
+  if (!filename) return false
+  const videoExtensions = ['.mp4', '.avi', '.mov', '.wmv', '.flv', '.mkv', '.webm']
+  return videoExtensions.some(ext => filename.toLowerCase().endsWith(ext))
+}
+
+// 获取素材预览URL
+const getMaterialPreviewUrl = (filePath) => {
+  if (!filePath) return ''
+  const filename = filePath.split('/').pop() || filePath
+  return materialApi.getMaterialPreviewUrl(filename)
+}
+
+// 预览素材
+const previewMaterial = (material) => {
+  previewMaterialData.value = material
+  materialPreviewVisible.value = true
 }
 
 // 批量发布对话框状态
@@ -1033,6 +1211,60 @@ const batchPublish = async () => {
     isCancelled.value = false
   }
 }
+
+// 处理来自 AI 创作的数据
+onMounted(() => {
+  if (route.query.from === 'ai') {
+    try {
+      const aiDataStr = sessionStorage.getItem('ai-publish-data')
+      if (aiDataStr) {
+        const aiData = JSON.parse(aiDataStr)
+        
+        // 获取当前 tab
+        const tab = tabs[0]
+        
+        // 设置平台为小红书，内容类型为图文
+        tab.selectedPlatform = 1
+        tab.contentType = 'image'
+        
+        // 设置标题
+        if (aiData.title) {
+          tab.title = aiData.title
+        }
+        
+        // 设置正文内容
+        if (aiData.copywriting) {
+          tab.content = aiData.copywriting
+        }
+        
+        // 设置话题标签
+        if (aiData.tags && aiData.tags.length > 0) {
+          tab.selectedTopics = aiData.tags.slice(0, 10)
+        }
+        
+        // 设置图片文件（已转移到素材库的文件）
+        if (aiData.images && aiData.images.length > 0) {
+          tab.fileList = aiData.images.map(img => ({
+            name: img,
+            path: img,
+            url: `${apiBaseUrl}/videoFile/${img}`
+          }))
+          tab.displayFileList = tab.fileList.map(f => ({
+            name: f.name,
+            url: f.url
+          }))
+        }
+        
+        // 清除 sessionStorage
+        sessionStorage.removeItem('ai-publish-data')
+        
+        ElMessage.success('AI 创作内容已加载，请选择账号后发布')
+      }
+    } catch (e) {
+      console.error('Failed to load AI data:', e)
+    }
+  }
+})
 </script>
 
 <style lang="scss" scoped>
@@ -1206,6 +1438,18 @@ const batchPublish = async () => {
           margin: 0 0 10px 0;
         }
         
+        .content-type-switch {
+          margin-bottom: 20px;
+          padding: 15px;
+          background: #f5f7fa;
+          border-radius: 8px;
+          text-align: center;
+        }
+        
+        .content-section {
+          margin-top: 20px;
+        }
+        
         .upload-section,
         .account-section,
         .platform-section,
@@ -1229,6 +1473,15 @@ const batchPublish = async () => {
           :deep(.el-upload-dragger) {
             width: 100%;
             height: 180px;
+            cursor: pointer;
+            
+            &:hover {
+              border-color: var(--el-color-primary);
+            }
+          }
+          
+          :deep(.el-upload__input) {
+            display: none;
           }
         }
         
@@ -1247,6 +1500,10 @@ const batchPublish = async () => {
         }
         
         .title-input {
+          max-width: 600px;
+        }
+        
+        .content-input {
           max-width: 600px;
         }
         
@@ -1420,6 +1677,197 @@ const batchPublish = async () => {
       display: flex;
       justify-content: flex-end;
       gap: 12px;
+    }
+  }
+
+  // 素材库选择弹窗样式
+  .material-library-dialog {
+    .material-library-content {
+      max-height: 60vh;
+      overflow-y: auto;
+      
+      .material-list {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 16px;
+        padding: 10px 0;
+        
+        .material-item {
+          position: relative;
+          border: 1px solid #dcdfe6;
+          border-radius: 8px;
+          padding: 12px;
+          transition: all 0.3s;
+          background: #fff;
+          
+          &:hover {
+            border-color: var(--el-color-primary);
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+          }
+          
+          .material-checkbox {
+            width: 100%;
+            margin: 0;
+            
+            :deep(.el-checkbox__label) {
+              width: 100%;
+              padding-left: 8px;
+            }
+          }
+          
+          .material-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            width: 100%;
+            
+            .material-thumbnail {
+              flex-shrink: 0;
+              width: 60px;
+              height: 60px;
+              min-width: 60px;
+              min-height: 60px;
+              max-width: 60px;
+              max-height: 60px;
+              border-radius: 6px;
+              overflow: hidden;
+              background: #f5f7fa;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              position: relative;
+              
+              // 图片缩略图可点击
+              &.image-thumbnail-clickable {
+                cursor: pointer;
+                
+                &:hover {
+                  opacity: 0.8;
+                  transform: scale(1.05);
+                  transition: all 0.2s;
+                  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+                }
+              }
+              
+              .thumbnail-image {
+                width: 100%;
+                height: 100%;
+                max-width: 60px;
+                max-height: 60px;
+                
+                :deep(.el-image__inner) {
+                  width: 100% !important;
+                  height: 100% !important;
+                  max-width: 60px !important;
+                  max-height: 60px !important;
+                  object-fit: cover;
+                }
+                
+                :deep(img) {
+                  width: 100% !important;
+                  height: 100% !important;
+                  max-width: 60px !important;
+                  max-height: 60px !important;
+                  object-fit: cover;
+                }
+              }
+              
+              .thumbnail-error {
+                width: 60px;
+                height: 60px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: #909399;
+                font-size: 24px;
+              }
+              
+              &.video-thumbnail {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                
+                .video-icon {
+                  font-size: 28px;
+                }
+              }
+              
+              &.file-thumbnail {
+                background: #e6e8eb;
+                color: #606266;
+                
+                .file-icon {
+                  font-size: 28px;
+                }
+              }
+            }
+            
+            .material-details-wrapper {
+              flex: 1;
+              min-width: 0;
+              
+              .material-name {
+                font-size: 14px;
+                font-weight: 500;
+                color: #303133;
+                margin-bottom: 6px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+              }
+              
+              .material-meta {
+                display: flex;
+                gap: 12px;
+                font-size: 12px;
+                color: #909399;
+                
+                .file-size,
+                .upload-time {
+                  white-space: nowrap;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // 素材预览弹窗样式
+  .material-preview-dialog {
+    .material-preview-content {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 60vh;
+      padding: 20px;
+      
+      .preview-image {
+        max-width: 100%;
+        max-height: 80vh;
+        
+        :deep(img) {
+          max-width: 100%;
+          max-height: 80vh;
+          object-fit: contain;
+        }
+      }
+      
+      .preview-info {
+        text-align: center;
+        padding: 40px;
+        
+        p {
+          margin: 15px 0;
+          font-size: 16px;
+          color: #303133;
+          
+          strong {
+            color: #606266;
+            margin-right: 8px;
+          }
+        }
+      }
     }
   }
 }

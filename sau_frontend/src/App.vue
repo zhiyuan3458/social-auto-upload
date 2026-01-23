@@ -32,6 +32,18 @@
               <el-icon><Upload /></el-icon>
               <span>发布中心</span>
             </el-menu-item>
+            <el-sub-menu index="/ai">
+              <template #title>
+                <el-icon><MagicStick /></el-icon>
+                <span>AI 创作</span>
+              </template>
+              <el-menu-item index="/ai-create">
+                <span>内容生成</span>
+              </el-menu-item>
+              <el-menu-item index="/ai-settings">
+                <span>AI 设置</span>
+              </el-menu-item>
+            </el-sub-menu>
             <el-menu-item index="/website">
               <el-icon><Monitor /></el-icon>
               <span>网站</span>
@@ -67,14 +79,19 @@ import { ref, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { 
   HomeFilled, User, Monitor, DataAnalysis, 
-  Fold, Picture, Upload
+  Fold, Picture, Upload, MagicStick
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
 
 // 当前激活的菜单项
 const activeMenu = computed(() => {
-  return route.path
+  const path = route.path
+  // AI 创作子路由统一高亮到 /ai-create
+  if (path.startsWith('/ai-create')) {
+    return '/ai-create'
+  }
+  return path
 })
 
 // 侧边栏折叠状态

@@ -1,9 +1,13 @@
 import asyncio
 import os
+import sys
 import sqlite3
 import threading
 import time
 import uuid
+import logging
+import traceback
+from datetime import datetime
 from pathlib import Path
 from queue import Queue
 from flask_cors import CORS
@@ -13,14 +17,101 @@ from conf import BASE_DIR, DATA_DIR
 from myUtils.login import get_tencent_cookie, douyin_cookie_gen, get_ks_cookie, xiaohongshu_cookie_gen
 from myUtils.postVideo import post_video_tencent, post_video_DouYin, post_video_ks, post_video_xhs
 
+# ============ 日志配置 ============
+def setup_logging():
+    """配置日志系统，将日志写入到安装目录的 logs 文件夹"""
+    # 创建 logs 目录
+    logs_dir = Path(DATA_DIR) / 'logs'
+    logs_dir.mkdir(parents=True, exist_ok=True)
+    
+    # 日志文件名（按日期）
+    log_filename = logs_dir / f"backend_{datetime.now().strftime('%Y%m%d')}.log"
+    
+    # 配置根日志器
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.DEBUG)
+    
+    # 文件处理器（详细日志）
+    file_handler = logging.FileHandler(log_filename, encoding='utf-8')
+    file_handler.setLevel(logging.DEBUG)
+    file_formatter = logging.Formatter(
+        '%(asctime)s | %(levelname)-8s | %(name)s:%(lineno)d | %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    file_handler.setFormatter(file_formatter)
+    
+    # 控制台处理器（简要日志）
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(logging.INFO)
+    console_formatter = logging.Formatter('%(asctime)s | %(levelname)s | %(message)s', datefmt='%H:%M:%S')
+    console_handler.setFormatter(console_formatter)
+    
+    # 添加处理器
+    root_logger.addHandler(file_handler)
+    root_logger.addHandler(console_handler)
+    
+    # 记录启动信息
+    logging.info("=" * 60)
+    logging.info("后端服务启动")
+    logging.info(f"日志目录: {logs_dir}")
+    logging.info(f"数据目录: {DATA_DIR}")
+    logging.info(f"基础目录: {BASE_DIR}")
+    logging.info(f"Python 版本: {sys.version}")
+    logging.info(f"是否打包环境: {getattr(sys, 'frozen', False)}")
+    logging.info("=" * 60)
+    
+    return log_filename
+
+# 初始化日志
+LOG_FILE = setup_logging()
+logger = logging.getLogger(__name__)
+
+# 导入 AI 模块
+from ai_module import register_ai_routes
+
 active_queues = {}
 app = Flask(__name__)
 
 #允许所有来源跨域访问
 CORS(app)
 
+# 注册 AI 路由
+register_ai_routes(app)
+
 # 限制上传文件大小为160MB
 app.config['MAX_CONTENT_LENGTH'] = 160 * 1024 * 1024
+
+# ============ 全局异常处理 ============
+@app.errorhandler(Exception)
+def handle_exception(e):
+    """全局异常处理器，记录所有未捕获的异常"""
+    error_msg = f"未捕获的异常: {str(e)}"
+    logger.error(error_msg)
+    logger.error(f"请求路径: {request.path}")
+    logger.error(f"请求方法: {request.method}")
+    logger.error(f"详细错误堆栈:\n{traceback.format_exc()}")
+    
+    return jsonify({
+        "code": 500,
+        "msg": f"服务器内部错误: {str(e)}",
+        "data": None
+    }), 500
+
+@app.errorhandler(404)
+def handle_not_found(e):
+    """404 错误处理"""
+    logger.warning(f"404 错误: {request.path}")
+    return jsonify({
+        "code": 404,
+        "msg": f"接口不存在: {request.path}",
+        "data": None
+    }), 404
+
+@app.before_request
+def log_request():
+    """记录每个请求"""
+    if not request.path.startswith('/assets') and not request.path.endswith('.ico'):
+        logger.debug(f"请求: {request.method} {request.path}")
 
 # 获取当前目录（假设 index.html 和 assets 在这里）
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -193,64 +284,86 @@ def get_all_files():
 @app.route("/getAccounts", methods=['GET'])
 def getAccounts():
     """快速获取所有账号信息，不进行cookie验证"""
+    logger.info("API 调用: getAccounts")
     try:
-        with sqlite3.connect(Path(DATA_DIR / "db" / "database.db")) as conn:
+        db_path = Path(DATA_DIR / "db" / "database.db")
+        logger.debug(f"数据库路径: {db_path}, 存在: {db_path.exists()}")
+        
+        with sqlite3.connect(db_path) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            cursor.execute('''
-            SELECT * FROM user_info''')
+            cursor.execute('''SELECT * FROM user_info''')
             rows = cursor.fetchall()
             rows_list = [list(row) for row in rows]
 
-            print("\n📋 当前数据表内容（快速获取）：")
-            for row in rows:
-                print(row)
+            logger.info(f"获取账号列表成功，共 {len(rows_list)} 条记录")
 
-            return jsonify(
-                {
-                    "code": 200,
-                    "msg": None,
-                    "data": rows_list
-                }), 200
+            return jsonify({
+                "code": 200,
+                "msg": None,
+                "data": rows_list
+            }), 200
+            
     except Exception as e:
-        print(f"获取账号列表时出错: {str(e)}")
+        error_msg = f"获取账号列表失败: {str(e)}"
+        logger.error(error_msg)
+        logger.error(f"详细错误堆栈:\n{traceback.format_exc()}")
         return jsonify({
             "code": 500,
-            "msg": f"获取账号列表失败: {str(e)}",
+            "msg": error_msg,
             "data": None
         }), 500
 
 
-@app.route("/getValidAccounts",methods=['GET'])
+@app.route("/getValidAccounts", methods=['GET'])
 async def getValidAccounts():
-    with sqlite3.connect(Path(DATA_DIR / "db" / "database.db")) as conn:
-        cursor = conn.cursor()
-        cursor.execute('''
-        SELECT * FROM user_info''')
-        rows = cursor.fetchall()
-        rows_list = [list(row) for row in rows]
-        print("\n📋 当前数据表内容：")
-        for row in rows:
-            print(row)
-        for row in rows_list:
-            flag = await check_cookie(row[1],row[2])
-            if not flag:
-                row[4] = 0
-                cursor.execute('''
-                UPDATE user_info 
-                SET status = ? 
-                WHERE id = ?
-                ''', (0,row[0]))
-                conn.commit()
-                print("✅ 用户状态已更新")
-        for row in rows:
-            print(row)
-        return jsonify(
-                        {
-                            "code": 200,
-                            "msg": None,
-                            "data": rows_list
-                        }),200
+    """获取所有账号信息，并验证cookie有效性"""
+    logger.info("API 调用: getValidAccounts")
+    try:
+        db_path = Path(DATA_DIR / "db" / "database.db")
+        logger.debug(f"数据库路径: {db_path}, 存在: {db_path.exists()}")
+        
+        with sqlite3.connect(db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''SELECT * FROM user_info''')
+            rows = cursor.fetchall()
+            rows_list = [list(row) for row in rows]
+            
+            logger.info(f"查询到 {len(rows_list)} 个账号，开始验证 cookie...")
+            
+            for i, row in enumerate(rows_list):
+                try:
+                    logger.debug(f"验证账号 [{i+1}/{len(rows_list)}]: type={row[1]}, cookie_file={row[2]}")
+                    flag = await check_cookie(row[1], row[2])
+                    if not flag:
+                        row[4] = 0
+                        cursor.execute('''
+                        UPDATE user_info 
+                        SET status = ? 
+                        WHERE id = ?
+                        ''', (0, row[0]))
+                        conn.commit()
+                        logger.info(f"账号 {row[0]} cookie 已失效，状态已更新")
+                except Exception as cookie_error:
+                    logger.warning(f"验证账号 {row[0]} cookie 时出错: {str(cookie_error)}")
+                    # 继续处理其他账号
+            
+            logger.info(f"getValidAccounts 完成，返回 {len(rows_list)} 条记录")
+            return jsonify({
+                "code": 200,
+                "msg": None,
+                "data": rows_list
+            }), 200
+            
+    except Exception as e:
+        error_msg = f"获取有效账号列表失败: {str(e)}"
+        logger.error(error_msg)
+        logger.error(f"详细错误堆栈:\n{traceback.format_exc()}")
+        return jsonify({
+            "code": 500,
+            "msg": error_msg,
+            "data": None
+        }), 500
 
 @app.route('/deleteFile', methods=['GET'])
 def delete_file():
@@ -665,6 +778,326 @@ def sse_stream(status_queue):
         else:
             # 避免 CPU 占满
             time.sleep(0.1)
+
+# AI 素材转移到素材库
+@app.route('/api/ai/transfer-to-material', methods=['POST'])
+def transfer_ai_to_material():
+    """将 AI 生成的图片转移到素材库"""
+    import shutil
+    
+    try:
+        data = request.get_json() or {}
+        task_id = data.get('task_id')
+        images = data.get('images', [])
+        title = data.get('title', 'AI生成图文')
+        
+        if not task_id or not images:
+            return jsonify({
+                "code": 400,
+                "msg": "task_id and images are required",
+                "data": None
+            }), 400
+        
+        # AI 图片源目录
+        ai_history_dir = Path(DATA_DIR) / 'ai_history' / task_id
+        if not ai_history_dir.exists():
+            return jsonify({
+                "code": 404,
+                "msg": "AI task not found",
+                "data": None
+            }), 404
+        
+        # 素材目标目录
+        material_dir = Path(DATA_DIR) / 'videoFile'
+        material_dir.mkdir(parents=True, exist_ok=True)
+        
+        # 转移图片
+        transferred = []
+        with sqlite3.connect(Path(DATA_DIR / "db" / "database.db")) as conn:
+            cursor = conn.cursor()
+            
+            for img_filename in images:
+                src_path = ai_history_dir / img_filename
+                if not src_path.exists():
+                    continue
+                
+                # 生成唯一文件名
+                unique_name = f"ai_{task_id}_{img_filename}"
+                dst_path = material_dir / unique_name
+                
+                # 复制文件
+                shutil.copy2(src_path, dst_path)
+                
+                # 获取文件大小 (MB)
+                file_size_mb = dst_path.stat().st_size / (1024 * 1024)
+                
+                # 插入数据库
+                cursor.execute(
+                    "INSERT INTO file_records (filename, filesize, file_path) VALUES (?, ?, ?)",
+                    (unique_name, file_size_mb, str(dst_path))
+                )
+                
+                transferred.append({
+                    "original": img_filename,
+                    "new_name": unique_name,
+                    "path": str(dst_path)
+                })
+            
+            conn.commit()
+        
+        return jsonify({
+            "code": 200,
+            "msg": "Transfer successful",
+            "data": {
+                "transferred": transferred,
+                "count": len(transferred)
+            }
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            "code": 500,
+            "msg": str(e),
+            "data": None
+        }), 500
+
+
+# 小红书图文发布接口
+@app.route('/postImageXHS', methods=['POST'])
+def post_image_xhs():
+    """
+    发布小红书图文笔记
+    
+    请求参数:
+        - title: 标题 (最多20字)
+        - content: 正文内容 (最多1000字)
+        - tags: 话题标签列表 (不带#号)
+        - imageList: 图片文件名列表 (素材库中的文件)
+        - accountList: 账号 cookie 文件路径列表
+        - enableTimer: 是否定时发布 (0/1)
+        - publishTime: 发布时间 (如: "2024-01-20 10:00")
+    """
+    from uploader.xiaohongshu_uploader.image_uploader import post_image_xhs as xhs_post_image
+    from datetime import datetime
+    
+    try:
+        data = request.get_json() or {}
+        
+        title = data.get('title', '')
+        content = data.get('content', '')
+        tags = data.get('tags', [])
+        image_list = data.get('imageList', [])
+        account_list = data.get('accountList', [])
+        enable_timer = data.get('enableTimer', 0)
+        publish_time = data.get('publishTime', '')
+        
+        if not image_list:
+            return jsonify({
+                "code": 400,
+                "msg": "图片列表不能为空",
+                "data": None
+            }), 400
+        
+        if not account_list:
+            return jsonify({
+                "code": 400,
+                "msg": "请选择发布账号",
+                "data": None
+            }), 400
+        
+        # 构建图片完整路径
+        image_paths = []
+        for img_name in image_list:
+            img_path = Path(DATA_DIR) / "videoFile" / img_name
+            if img_path.exists():
+                image_paths.append(str(img_path))
+            else:
+                # 尝试从 AI 历史记录目录查找
+                ai_path = Path(DATA_DIR) / "ai_history"
+                for task_dir in ai_path.iterdir() if ai_path.exists() else []:
+                    possible_path = task_dir / img_name
+                    if possible_path.exists():
+                        image_paths.append(str(possible_path))
+                        break
+        
+        if not image_paths:
+            return jsonify({
+                "code": 400,
+                "msg": "找不到指定的图片文件",
+                "data": None
+            }), 400
+        
+        # 解析发布时间
+        publish_date = 0
+        if enable_timer and publish_time:
+            try:
+                publish_date = datetime.strptime(publish_time, "%Y-%m-%d %H:%M")
+            except:
+                pass
+        
+        # 构建账号文件路径
+        account_files = [Path(DATA_DIR / "cookiesFile" / acc) for acc in account_list]
+        
+        results = []
+        for account_file in account_files:
+            if not account_file.exists():
+                results.append({
+                    "account": str(account_file.name),
+                    "success": False,
+                    "error": "cookie 文件不存在"
+                })
+                continue
+            
+            try:
+                # 执行上传
+                success = asyncio.run(xhs_post_image(
+                    title=title,
+                    image_paths=image_paths,
+                    content=content,
+                    tags=tags,
+                    account_file=str(account_file),
+                    publish_date=publish_date
+                ))
+                
+                results.append({
+                    "account": str(account_file.name),
+                    "success": success,
+                    "error": None if success else "上传失败"
+                })
+                
+            except Exception as e:
+                results.append({
+                    "account": str(account_file.name),
+                    "success": False,
+                    "error": str(e)
+                })
+        
+        # 统计结果
+        success_count = sum(1 for r in results if r["success"])
+        
+        return jsonify({
+            "code": 200 if success_count > 0 else 500,
+            "msg": f"发布完成: {success_count}/{len(results)} 成功",
+            "data": {
+                "results": results,
+                "total": len(results),
+                "success": success_count
+            }
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            "code": 500,
+            "msg": str(e),
+            "data": None
+        }), 500
+
+
+# AI 图文一键发布到小红书
+@app.route('/api/ai/publish-to-xhs', methods=['POST'])
+def ai_publish_to_xhs():
+    """
+    将 AI 生成的图文直接发布到小红书
+    
+    请求参数:
+        - task_id: AI 任务 ID
+        - title: 标题
+        - content: 正文内容  
+        - tags: 标签列表
+        - accountId: 账号 ID
+    """
+    from uploader.xiaohongshu_uploader.image_uploader import post_image_xhs as xhs_post_image
+    
+    try:
+        data = request.get_json() or {}
+        
+        task_id = data.get('task_id')
+        title = data.get('title', '')
+        content = data.get('content', '')
+        tags = data.get('tags', [])
+        account_id = data.get('accountId')
+        
+        if not task_id:
+            return jsonify({
+                "code": 400,
+                "msg": "task_id 不能为空",
+                "data": None
+            }), 400
+        
+        # 获取 AI 生成的图片
+        ai_history_dir = Path(DATA_DIR) / 'ai_history' / task_id
+        if not ai_history_dir.exists():
+            return jsonify({
+                "code": 404,
+                "msg": "找不到 AI 任务",
+                "data": None
+            }), 404
+        
+        # 收集图片文件
+        image_paths = []
+        for i in range(20):  # 最多20张图
+            img_path = ai_history_dir / f"{i}.png"
+            if img_path.exists():
+                image_paths.append(str(img_path))
+        
+        if not image_paths:
+            return jsonify({
+                "code": 400,
+                "msg": "没有找到生成的图片",
+                "data": None
+            }), 400
+        
+        # 获取账号 cookie 文件
+        account_file = None
+        if account_id:
+            with sqlite3.connect(Path(DATA_DIR / "db" / "database.db")) as conn:
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+                cursor.execute("SELECT * FROM user_info WHERE id = ?", (account_id,))
+                account = cursor.fetchone()
+                if account:
+                    account_file = Path(DATA_DIR / "cookiesFile" / account['filePath'])
+        
+        if not account_file or not account_file.exists():
+            return jsonify({
+                "code": 400,
+                "msg": "账号不存在或 cookie 已失效",
+                "data": None
+            }), 400
+        
+        # 执行上传
+        success = asyncio.run(xhs_post_image(
+            title=title,
+            image_paths=image_paths,
+            content=content,
+            tags=tags,
+            account_file=str(account_file),
+            publish_date=0
+        ))
+        
+        if success:
+            return jsonify({
+                "code": 200,
+                "msg": "发布成功",
+                "data": {
+                    "task_id": task_id,
+                    "image_count": len(image_paths)
+                }
+            }), 200
+        else:
+            return jsonify({
+                "code": 500,
+                "msg": "发布失败",
+                "data": None
+            }), 500
+        
+    except Exception as e:
+        return jsonify({
+            "code": 500,
+            "msg": str(e),
+            "data": None
+        }), 500
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0' ,port=5409)

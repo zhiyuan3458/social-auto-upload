@@ -1,0 +1,10 @@
+active_provider: gpt4o
+providers:
+  gpt4o:
+    api_key: sk-YnxSYFVOIFXXJtlLCtquIG9KgPEw20PmobjoIaMe7kk3VJKZ
+    base_url: https://yinli.one/v1
+    max_output_tokens: 4096
+    model: gpt-4o
+    name: GPT-4o
+    temperature: 0.7
+    type: openai_compatible
