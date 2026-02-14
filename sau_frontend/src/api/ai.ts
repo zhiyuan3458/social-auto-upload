@@ -7,6 +7,7 @@ import type {
   Page,
   OutlineResponse,
   ContentResponse,
+  VideoPlanResponse,
   ProgressEvent,
   FinishEvent,
   HistoryRecord,
@@ -57,6 +58,26 @@ export async function generateContent(
     topic,
     outline
   })
+  return response.data || response
+}
+
+/**
+ * 生成视频提示词包（通用：可灵/即梦等）
+ */
+export async function generateVideoPlan(payload: {
+  topic: string
+  outline?: string
+  platform?: string
+  aspect_ratio?: string
+  duration_seconds?: number
+  product_info?: string
+  target_audience?: string
+  selling_points?: string
+  style?: string
+  must_include?: string
+  forbidden?: string
+}): Promise<VideoPlanResponse> {
+  const response = await request.post<VideoPlanResponse>(`${API_BASE_URL}/video/plan`, payload)
   return response.data || response
 }
 
@@ -299,5 +320,25 @@ export async function testAIConnection(config: {
   model: string
 }): Promise<{ success: boolean; message?: string; error?: string }> {
   const response = await request.post(`${API_BASE_URL}/config/test`, config)
+  return response.data || response
+}
+
+/**
+ * 生成视频（调用可灵/即梦等 API）
+ */
+export async function generateVideo(payload: {
+  prompt: string
+  duration?: number
+  aspect_ratio?: string
+  download?: boolean
+}): Promise<{
+  success: boolean
+  video_url?: string
+  local_path?: string
+  filename?: string
+  task_id?: string
+  error?: string
+}> {
+  const response = await request.post(`${API_BASE_URL}/video/generate`, payload)
   return response.data || response
 }

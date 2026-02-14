@@ -58,6 +58,21 @@ class AIConfig:
         }
     }
     
+    DEFAULT_VIDEO_CONFIG = {
+        'api_url': '',
+        'method': 'POST',
+        'headers': {},
+        'body_template': {},
+        'response_video_path': 'data.video_url',
+        'need_polling': False,
+        'task_id_path': 'data.task_id',
+        'poll_url': '',
+        'poll_interval': 5,
+        'max_poll_count': 30,
+        'success_status': 'completed',
+        'status_path': 'data.status'
+    }
+    
     @classmethod
     def get_config_dir(cls):
         """获取 AI 配置目录"""
@@ -139,6 +154,34 @@ class AIConfig:
             yaml.dump(config, f, allow_unicode=True, default_flow_style=False)
         cls._image_providers_config = config
         logger.info(f"Image providers config saved to {config_path}")
+    
+    @classmethod
+    def load_video_generation_config(cls):
+        """加载视频生成配置"""
+        config_path = cls.get_config_dir() / 'video_generation.yaml'
+        logger.debug(f"Loading video generation config: {config_path}")
+        
+        if not config_path.exists():
+            logger.info("Video generation config not found, using default")
+            cls.save_video_generation_config(cls.DEFAULT_VIDEO_CONFIG.copy())
+            return cls.DEFAULT_VIDEO_CONFIG.copy()
+        
+        try:
+            with open(config_path, 'r', encoding='utf-8') as f:
+                config = yaml.safe_load(f) or {}
+            logger.debug(f"Video generation config loaded")
+            return config
+        except yaml.YAMLError as e:
+            logger.error(f"Video generation config YAML error: {e}")
+            return cls.DEFAULT_VIDEO_CONFIG.copy()
+    
+    @classmethod
+    def save_video_generation_config(cls, config):
+        """保存视频生成配置"""
+        config_path = cls.get_config_dir() / 'video_generation.yaml'
+        with open(config_path, 'w', encoding='utf-8') as f:
+            yaml.dump(config, f, allow_unicode=True, default_flow_style=False)
+        logger.info(f"Video generation config saved to {config_path}")
     
     @classmethod
     def get_active_text_provider(cls):

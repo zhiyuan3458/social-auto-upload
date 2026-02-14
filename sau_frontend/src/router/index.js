@@ -11,6 +11,7 @@ import AIOutlineView from '../views/ai/AIOutlineView.vue'
 import AIGenerateView from '../views/ai/AIGenerateView.vue'
 import AIResultView from '../views/ai/AIResultView.vue'
 import AISettingsView from '../views/ai/AISettingsView.vue'
+import AIWizardView from '../views/ai/AIWizardView.vue'
 
 const routes = [
   {
@@ -43,6 +44,11 @@ const routes = [
     path: '/ai-create',
     name: 'AICreate',
     component: AICreateView
+  },
+  {
+    path: '/ai-wizard',
+    name: 'AIWizard',
+    component: AIWizardView
   },
   {
     path: '/ai-create/outline',

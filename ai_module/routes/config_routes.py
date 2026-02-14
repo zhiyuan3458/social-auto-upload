@@ -24,6 +24,7 @@ def create_config_blueprint():
         try:
             text_config = AIConfig.load_text_providers_config()
             image_config = AIConfig.load_image_providers_config()
+            video_config = AIConfig.load_video_generation_config()
             
             # 隐藏敏感信息
             def mask_api_key(config):
@@ -41,11 +42,25 @@ def create_config_blueprint():
                         result[key] = value
                 return result
             
+            # 隐藏视频配置中的敏感信息
+            def mask_video_config(config):
+                result = config.copy()
+                if 'headers' in result and isinstance(result['headers'], dict):
+                    headers = result['headers'].copy()
+                    for key in headers:
+                        if 'auth' in key.lower() or 'key' in key.lower() or 'token' in key.lower():
+                            val = headers[key]
+                            if isinstance(val, str) and len(val) > 8:
+                                headers[key] = val[:8] + '****'
+                    result['headers'] = headers
+                return result
+            
             return jsonify({
                 "success": True,
                 "config": {
                     "text_generation": mask_api_key(text_config),
-                    "image_generation": mask_api_key(image_config)
+                    "image_generation": mask_api_key(image_config),
+                    "video_generation": mask_video_config(video_config)
                 }
             })
             
@@ -71,6 +86,10 @@ def create_config_blueprint():
                 AIConfig.save_image_providers_config(image_config)
                 # 重置图片服务实例
                 reset_image_service()
+            
+            if 'video_generation' in data:
+                video_config = data['video_generation']
+                AIConfig.save_video_generation_config(video_config)
             
             return jsonify({
                 "success": True,

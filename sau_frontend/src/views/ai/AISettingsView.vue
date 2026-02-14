@@ -100,6 +100,119 @@
             </el-form-item>
           </el-form>
         </el-tab-pane>
+
+        <!-- 视频生成配置（新增） -->
+        <el-tab-pane label="视频生成 API" name="video">
+          <el-alert type="info" :closable="false" style="margin-bottom: 20px">
+            <template #title>
+              配置可灵/即梦等视频生成 API，系统将自动调用并下载视频到素材库
+            </template>
+          </el-alert>
+
+          <el-form 
+            :model="videoConfig" 
+            label-width="140px"
+            label-position="left"
+          >
+            <el-form-item label="API 地址" required>
+              <el-input 
+                v-model="videoConfig.api_url" 
+                placeholder="例如：https://api.keling.com/v1/generate"
+              />
+            </el-form-item>
+
+            <el-form-item label="请求方法">
+              <el-select v-model="videoConfig.method" style="width: 200px">
+                <el-option label="POST" value="POST" />
+                <el-option label="GET" value="GET" />
+              </el-select>
+            </el-form-item>
+
+            <el-form-item label="请求头（JSON）">
+              <el-input 
+                v-model="videoConfig.headers" 
+                type="textarea"
+                :rows="5"
+                placeholder='{"Authorization": "Bearer YOUR_API_KEY", "Content-Type": "application/json"}'
+              />
+              <div class="hint">每行一个键值对，格式为 JSON 对象</div>
+            </el-form-item>
+
+            <el-form-item label="请求体模板（JSON）">
+              <el-input 
+                v-model="videoConfig.body_template" 
+                type="textarea"
+                :rows="8"
+                placeholder='{"prompt": "{{prompt}}", "duration": {{duration}}, "aspect_ratio": "{{aspect_ratio}}"}'
+              />
+              <div class="hint">
+                支持变量：{{prompt}}（提示词）、{{duration}}（时长）、{{aspect_ratio}}（画幅）
+              </div>
+            </el-form-item>
+
+            <el-form-item label="响应视频URL路径">
+              <el-input 
+                v-model="videoConfig.response_video_path" 
+                placeholder="例如：data.video_url 或 result.url"
+              />
+              <div class="hint">用 . 分隔嵌套路径，如：data.result.video_url</div>
+            </el-form-item>
+
+            <el-form-item label="是否需要轮询">
+              <el-switch v-model="videoConfig.need_polling" />
+              <div class="hint">某些 API 返回任务ID，需要轮询获取结果</div>
+            </el-form-item>
+
+            <template v-if="videoConfig.need_polling">
+              <el-form-item label="任务ID路径">
+                <el-input 
+                  v-model="videoConfig.task_id_path" 
+                  placeholder="例如：data.task_id"
+                />
+              </el-form-item>
+
+              <el-form-item label="查询地址">
+                <el-input 
+                  v-model="videoConfig.poll_url" 
+                  placeholder="例如：https://api.keling.com/v1/task/{{task_id}}"
+                />
+                <div class="hint">支持变量：{{task_id}}</div>
+              </el-form-item>
+
+              <el-form-item label="轮询间隔（秒）">
+                <el-input-number v-model="videoConfig.poll_interval" :min="1" :max="60" />
+              </el-form-item>
+
+              <el-form-item label="最大轮询次数">
+                <el-input-number v-model="videoConfig.max_poll_count" :min="5" :max="100" />
+              </el-form-item>
+
+              <el-form-item label="完成状态值">
+                <el-input 
+                  v-model="videoConfig.success_status" 
+                  placeholder="例如：completed 或 success"
+                />
+                <div class="hint">响应中表示任务完成的状态值</div>
+              </el-form-item>
+
+              <el-form-item label="状态字段路径">
+                <el-input 
+                  v-model="videoConfig.status_path" 
+                  placeholder="例如：data.status"
+                />
+              </el-form-item>
+            </template>
+
+            <el-form-item>
+              <el-button type="primary" @click="saveVideoConfig" :loading="savingVideo">
+                保存配置
+              </el-button>
+              <el-button @click="testVideoConfig" :loading="testingVideo">
+                测试配置
+              </el-button>
+            </el-form-item>
+          </el-form>
+        </el-tab-pane>
       </el-tabs>
     </el-card>
 
@@ -152,9 +265,26 @@ const imageConfig = reactive({
   quality: 'standard'
 })
 
+const videoConfig = reactive({
+  api_url: '',
+  method: 'POST',
+  headers: '{"Authorization": "Bearer YOUR_API_KEY", "Content-Type": "application/json"}',
+  body_template: '{"prompt": "{{prompt}}", "duration": {{duration}}, "aspect_ratio": "{{aspect_ratio}}"}',
+  response_video_path: 'data.video_url',
+  need_polling: false,
+  task_id_path: 'data.task_id',
+  poll_url: '',
+  poll_interval: 5,
+  max_poll_count: 30,
+  success_status: 'completed',
+  status_path: 'data.status'
+})
+
 const testingText = ref(false)
 const savingText = ref(false)
 const savingImage = ref(false)
+const savingVideo = ref(false)
+const testingVideo = ref(false)
 
 onMounted(async () => {
   try {
@@ -180,6 +310,23 @@ onMounted(async () => {
       imageConfig.model = imageProviderConfig.model || 'dall-e-3'
       imageConfig.default_size = imageProviderConfig.default_size || '1024x1024'
       imageConfig.quality = imageProviderConfig.quality || 'standard'
+
+      // 加载视频生成配置
+      const videoGenConfig = result.config.video_generation || {}
+      if (videoGenConfig.api_url) {
+        videoConfig.api_url = videoGenConfig.api_url
+        videoConfig.method = videoGenConfig.method || 'POST'
+        videoConfig.headers = JSON.stringify(videoGenConfig.headers || {}, null, 2)
+        videoConfig.body_template = JSON.stringify(videoGenConfig.body_template || {}, null, 2)
+        videoConfig.response_video_path = videoGenConfig.response_video_path || 'data.video_url'
+        videoConfig.need_polling = videoGenConfig.need_polling || false
+        videoConfig.task_id_path = videoGenConfig.task_id_path || 'data.task_id'
+        videoConfig.poll_url = videoGenConfig.poll_url || ''
+        videoConfig.poll_interval = videoGenConfig.poll_interval || 5
+        videoConfig.max_poll_count = videoGenConfig.max_poll_count || 30
+        videoConfig.success_status = videoGenConfig.success_status || 'completed'
+        videoConfig.status_path = videoGenConfig.status_path || 'data.status'
+      }
     }
   } catch (e) {
     console.error('Failed to load config:', e)
@@ -276,6 +423,65 @@ async function saveImageConfig() {
     savingImage.value = false
   }
 }
+
+async function saveVideoConfig() {
+  if (!videoConfig.api_url.trim()) {
+    ElMessage.warning('请填写 API 地址')
+    return
+  }
+
+  savingVideo.value = true
+  try {
+    // 解析 JSON 字符串
+    let headers = {}
+    let bodyTemplate = {}
+    
+    try {
+      headers = JSON.parse(videoConfig.headers || '{}')
+    } catch {
+      ElMessage.error('请求头 JSON 格式错误')
+      return
+    }
+    
+    try {
+      bodyTemplate = JSON.parse(videoConfig.body_template || '{}')
+    } catch {
+      ElMessage.error('请求体模板 JSON 格式错误')
+      return
+    }
+
+    const result = await updateAIConfig({
+      video_generation: {
+        api_url: videoConfig.api_url,
+        method: videoConfig.method,
+        headers,
+        body_template: bodyTemplate,
+        response_video_path: videoConfig.response_video_path,
+        need_polling: videoConfig.need_polling,
+        task_id_path: videoConfig.task_id_path,
+        poll_url: videoConfig.poll_url,
+        poll_interval: videoConfig.poll_interval,
+        max_poll_count: videoConfig.max_poll_count,
+        success_status: videoConfig.success_status,
+        status_path: videoConfig.status_path
+      }
+    })
+
+    if (result.success) {
+      ElMessage.success('保存成功')
+    } else {
+      ElMessage.error(result.error || '保存失败')
+    }
+  } catch (e: any) {
+    ElMessage.error(e.message || '保存失败')
+  } finally {
+    savingVideo.value = false
+  }
+}
+
+async function testVideoConfig() {
+  ElMessage.info('测试功能待实现，请先保存配置后在向导页实际调用')
+}
 </script>
 
 <style scoped>
@@ -301,5 +507,11 @@ async function saveImageConfig() {
 
 .tips li {
   margin: 5px 0;
+}
+
+.hint {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 4px;
 }
 </style>

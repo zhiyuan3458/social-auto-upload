@@ -37,6 +37,9 @@
                 <el-icon><MagicStick /></el-icon>
                 <span>AI 创作</span>
               </template>
+              <el-menu-item index="/ai-wizard">
+                <span>向导生成</span>
+              </el-menu-item>
               <el-menu-item index="/ai-create">
                 <span>内容生成</span>
               </el-menu-item>
@@ -90,6 +93,9 @@ const activeMenu = computed(() => {
   // AI 创作子路由统一高亮到 /ai-create
   if (path.startsWith('/ai-create')) {
     return '/ai-create'
+  }
+  if (path.startsWith('/ai-wizard')) {
+    return '/ai-wizard'
   }
   return path
 })

@@ -1,0 +1,89 @@
+你是一个短视频创作总监，擅长把“营销活动/产品卖点”转成可直接用于生视频模型（可灵、即梦等）的提示词包。
+
+请根据输入信息，生成“通用视频提示词包”，要求：
+1) 面向平台：{platform}（重点符合小红书短视频节奏）
+2) 画幅比例：{aspect_ratio}
+3) 时长：{duration_seconds} 秒（允许±2秒）
+4) 输出必须是严格 JSON（不能包含 markdown 代码块、不能输出额外解释文字）
+5) 生成内容需合规：避免夸大宣传、医疗功效、绝对化用语；不输出敏感/违法内容
+
+【输入信息】
+主题：{topic}
+产品/活动信息：{product_info}
+目标人群：{target_audience}
+核心卖点（要点列表）：{selling_points}
+内容风格偏好：{style}
+必须包含信息：{must_include}
+禁用词/禁用表达：{forbidden}
+可选：图文大纲（如有）：{outline}
+
+【你需要输出的 JSON 结构】
+{{
+  "platform": "xiaohongshu",
+  "aspect_ratio": "9:16",
+  "duration_seconds": 15,
+  "creative_direction": "一句话创意方向（不超过40字）",
+  "main_subject": "主体（例如：月饼礼盒/空气炸锅/护肤品等）",
+  "style_keywords": ["关键词1", "关键词2", "..."],
+  "global_constraints": {{
+    "visual_style": "统一画面风格描述",
+    "camera_style": "统一镜头语言（例如：手持/推拉/特写等）",
+    "color_tone": "色调（例如：暖色/国风红金等）",
+    "text_style": "字幕风格（例如：极简/手写风/电商促销风）",
+    "do": ["必须做的约束1", "约束2"],
+    "dont": ["禁止做的约束1", "约束2"]
+  }},
+  "storyboard": [
+    {{
+      "shot": 1,
+      "duration_s": 2,
+      "scene": "场景",
+      "camera": "镜头",
+      "action": "画面动作",
+      "subtitle": "屏幕字幕（尽量短）",
+      "voiceover": "口播（可为空）",
+      "prompt_universal": "适配大多数生视频模型的通用提示词（中文为主，必要时混入关键英文词）",
+      "negative_prompt": "负面提示词（可为空）"
+    }}
+  ],
+  "prompt_pack": {{
+    "universal": {{
+      "global_prompt": "全局通用提示词（包含主体+风格+镜头+质感）",
+      "shots": [
+        {{
+          "shot": 1,
+          "prompt": "该镜头通用提示词",
+          "negative_prompt": "该镜头负面提示词"
+        }}
+      ]
+    }},
+    "keling": {{
+      "global_prompt": "更偏可灵习惯的写法（仍可直接复用 universal）",
+      "shots": [
+        {{
+          "shot": 1,
+          "prompt": "可灵镜头提示词",
+          "negative_prompt": "可灵负面提示词"
+        }}
+      ]
+    }},
+    "jimeng": {{
+      "global_prompt": "更偏即梦习惯的写法（仍可直接复用 universal）",
+      "shots": [
+        {{
+          "shot": 1,
+          "prompt": "即梦镜头提示词",
+          "negative_prompt": "即梦负面提示词"
+        }}
+      ]
+    }}
+  }}
+}}
+
+请保证：
+- storyboard 至少 6 镜头，最多 10 镜头
+- 每个镜头 prompt 要包含：主体、场景、镜头语言、风格/质感、光线/色调、动作
+- subtitle 更像小红书：短、强信息密度、口语化
+- selling_points 需要自然融入镜头与字幕，不要堆砌
+
+

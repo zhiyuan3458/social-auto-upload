@@ -12,8 +12,11 @@ def create_ai_blueprint():
     from .outline_routes import create_outline_blueprint
     from .image_routes import create_image_blueprint
     from .content_routes import create_content_blueprint
+    from .video_routes import create_video_blueprint
+    from .video_generate_routes import create_video_generate_blueprint
     from .config_routes import create_config_blueprint
     from .history_routes import create_history_blueprint
+
     
     # 创建主 AI 蓝图
     ai_bp = Blueprint('ai', __name__, url_prefix='/api/ai')
@@ -22,6 +25,8 @@ def create_ai_blueprint():
     ai_bp.register_blueprint(create_outline_blueprint())
     ai_bp.register_blueprint(create_image_blueprint())
     ai_bp.register_blueprint(create_content_blueprint())
+    ai_bp.register_blueprint(create_video_blueprint())
+    ai_bp.register_blueprint(create_video_generate_blueprint())
     ai_bp.register_blueprint(create_config_blueprint())
     ai_bp.register_blueprint(create_history_blueprint())
     

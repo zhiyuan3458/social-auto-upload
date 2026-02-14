@@ -30,6 +30,50 @@ export interface ContentResponse {
   error?: string
 }
 
+// 视频提示词包响应
+export interface VideoPlanResponse {
+  success: boolean
+  video_plan?: VideoPlan
+  error?: string
+}
+
+export interface VideoPlan {
+  platform: string
+  aspect_ratio: string
+  duration_seconds: number
+  creative_direction?: string
+  main_subject?: string
+  style_keywords?: string[]
+  global_constraints?: Record<string, any>
+  storyboard?: VideoStoryboardShot[]
+  prompt_pack?: {
+    universal?: VideoPromptPack
+    keling?: VideoPromptPack
+    jimeng?: VideoPromptPack
+  }
+}
+
+export interface VideoStoryboardShot {
+  shot: number
+  duration_s?: number
+  scene?: string
+  camera?: string
+  action?: string
+  subtitle?: string
+  voiceover?: string
+  prompt_universal?: string
+  negative_prompt?: string
+}
+
+export interface VideoPromptPack {
+  global_prompt?: string
+  shots?: Array<{
+    shot: number
+    prompt: string
+    negative_prompt?: string
+  }>
+}
+
 // 进度事件
 export interface ProgressEvent {
   index: number

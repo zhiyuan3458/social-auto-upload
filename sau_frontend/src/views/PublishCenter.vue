@@ -587,9 +587,11 @@ import { Upload, Plus, Close, Folder, Picture, VideoCamera, Document } from '@el
 import { ElMessage } from 'element-plus'
 import { useAccountStore } from '@/stores/account'
 import { useAppStore } from '@/stores/app'
+import { usePublishPresetStore } from '@/stores/publishPreset'
 import { materialApi } from '@/api/material'
 
 const route = useRoute()
+const publishPresetStore = usePublishPresetStore()
 
 // API base URL
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5409'
@@ -1212,8 +1214,12 @@ const batchPublish = async () => {
   }
 }
 
-// 处理来自 AI 创作的数据
-onMounted(() => {
+// 处理来自 AI 创作的数据（图文流程，旧）+ AI 向导的数据（视频流程，新）
+onMounted(async () => {
+  // 加载素材库
+  await appStore.loadMaterials()
+  
+  // 方式1: 从 AI 图文创作过来（sessionStorage）
   if (route.query.from === 'ai') {
     try {
       const aiDataStr = sessionStorage.getItem('ai-publish-data')
@@ -1263,6 +1269,30 @@ onMounted(() => {
     } catch (e) {
       console.error('Failed to load AI data:', e)
     }
+  }
+  
+  // 方式2: 从 AI 向导页过来（publishPreset store）
+  const publishPresetStore = usePublishPresetStore()
+  const preset = publishPresetStore.consumePreset()
+  if (preset && tabs.length > 0) {
+    const firstTab = tabs[0]
+    
+    // 预填数据
+    firstTab.title = preset.title || ''
+    firstTab.selectedTopics = preset.tags || []
+    firstTab.selectedPlatform = preset.platform || 1
+    firstTab.contentType = preset.contentType || 'video'
+    
+    // 如果有视频文件（当前向导页不提供，但预留扩展）
+    if (preset.videoFiles && preset.videoFiles.length > 0) {
+      firstTab.fileList = preset.videoFiles
+      firstTab.displayFileList = preset.videoFiles.map(f => ({
+        name: f.name,
+        url: f.url
+      }))
+    }
+    
+    ElMessage.success('已自动填入标题和话题，请上传视频后发布')
   }
 })
 </script>
